@@ -1,0 +1,11 @@
+model:
+  api_key_env: "LLM_API_KEY"
+
+methods:
+  leaderboard:
+    - financeclaw
+
+budget:
+  max_output_tokens: 8192
+  temperature: 0.0
+  max_input_images: 1
