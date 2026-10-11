@@ -7,6 +7,7 @@ This repository contains the anonymous implementation accompanying the submitted
 - `src/`: core method, retrieval, memory, temporal, evaluation, and governance modules
 - `scripts/`: utility scripts
 - `utils/`: shared utilities
+- `datasets/`: benchmark data, organized as `datasets/<dataset-name>/data.json` and `eval.jsonl`
 - `config.yaml`: example runtime configuration
 - `requirements.txt`: Python dependencies
 
@@ -21,3 +22,5 @@ python -m pip install -r requirements.txt
 ## Usage
 
 The main runner is located at `src/runner.py`. Dataset and output paths can be supplied through the project configuration and command-line arguments used by the runner.
+
+Each dataset is stored directly under `datasets/` by name. The training split is named `data.json`, and the evaluation split is named `eval.jsonl`.
