@@ -282,7 +282,7 @@ def _build_prompt_plan(question: str, instruction: str, labels: Sequence[str]) -
         return _PromptPlan(
             profile=profile,
             system_prompt=(
-                "You are the unified FinanceClaw paper method. "
+                "You are a financial reasoning assistant. "
                 "Reason over temporal KG, conflict-aware memory, and governance constraints. "
                 "Return exactly one allowed label."
             ),
@@ -333,7 +333,7 @@ def _build_prompt_plan(question: str, instruction: str, labels: Sequence[str]) -
             profile=profile,
             system_prompt=(
                 "You are a financial taxonomy classifier. "
-                "Use only the supplied evidence and return the benchmark-facing category path."
+                "Use only the supplied evidence and return the category path required by the task."
             ),
             rules=(
                 "Select the most specific category path supported by the evidence.",
@@ -420,7 +420,7 @@ def _build_prompt_plan(question: str, instruction: str, labels: Sequence[str]) -
             rules=(
                 tagged_format_rule,
                 "Extract the concrete risk items supported by the evidence.",
-                "Prefer compact benchmark-style risk phrases.",
+                "Prefer compact risk phrases.",
                 "Inside <answer>, return only the risk items, separated by Chinese semicolons when multiple items are present.",
             ),
             final_instruction="Keep <think> brief and place only the risk summary in <answer>.",
@@ -439,7 +439,7 @@ def _build_prompt_plan(question: str, instruction: str, labels: Sequence[str]) -
             system_prompt="You summarize investment advice from Chinese financial research reports.",
             rules=(
                 "State the investment rating explicitly when the evidence supports one.",
-                "Mirror benchmark style: concise rating-first summary, then brief rationale.",
+                "Provide a concise rating-first summary, then brief rationale.",
                 "Do not replace a report rating with auxiliary temporal verdict words such as NEUTRAL.",
                 tagged_format_rule,
             ),
@@ -456,9 +456,9 @@ def _build_prompt_plan(question: str, instruction: str, labels: Sequence[str]) -
     if profile == "report_summary":
         return _PromptPlan(
             profile=profile,
-            system_prompt="You summarize Chinese financial research reports for benchmark evaluation.",
+            system_prompt="You summarize Chinese financial research reports.",
             rules=(
-                "Prefer 2-4 concise benchmark-style findings.",
+                "Prefer 2-4 concise findings.",
                 "When appropriate, separate key findings with the Chinese vertical bar character.",
                 "Keep the answer information-dense and grounded in the evidence.",
                 tagged_format_rule,
