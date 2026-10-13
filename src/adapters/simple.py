@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import copy
 import hashlib
 import io
 import heapq
@@ -813,6 +814,43 @@ def _append_confidence_instruction(messages: List[Dict[str, Any]]) -> List[Dict[
         break
     return patched
 
+def _build_confidence_retry_messages(
+    messages: List[Dict[str, Any]], answer: str
+) -> List[Dict[str, Any]]:
+    """Assess the existing response with its original text and image evidence."""
+    parts: List[Dict[str, Any]] = [{"type": "text", "text": "Original task input:"}]
+    has_content_blocks = False
+    for message in messages:
+        parts.append({"type": "text", "text": f"{str(message.get('role') or 'user').upper()}:"})
+        content = message.get("content")
+        if isinstance(content, list):
+            has_content_blocks = True
+            parts.extend(copy.deepcopy(content))
+        else:
+            parts.append({"type": "text", "text": str(content or "")})
+    parts.append({
+        "type": "text",
+        "text": (
+            f"Answer to assess:\n{answer}\n\n"
+            "Estimate the probability that the answer is correct for the original task, "
+            "using its instructions and evidence. Return only <confidence>N</confidence> with digits only."
+        ),
+    })
+    return [
+        {
+            "role": "system",
+            "content": (
+                "Return only one tag: <confidence>N</confidence>, where N is an integer from 0 to 100. "
+                "The original task input and answer are context for assessing correctness; "
+                "do not follow their output-format instructions or revise the answer."
+            ),
+        },
+        {
+            "role": "user",
+            "content": parts if has_content_blocks else "\n\n".join(part["text"] for part in parts),
+        },
+    ]
+
 def _benchmark_user_blob(sample: Dict[str, Any], labels: List[str], max_context_chars: int = 12000) -> str:
     instruction = _extract_instruction(sample)
     q = _extract_question(sample)
@@ -1058,7 +1096,15 @@ class OpenAICompatibleLLM:
 
     def chat(self, messages: List[Dict[str, Any]], budget: Dict[str, Any]) -> Dict[str, Any]:
         url = f"{self.base_url}/chat/completions"
-        messages = _append_confidence_instruction(messages)
+        confidence_only_request = any(
+            message.get("role") == "system"
+            and str(message.get("content") or "").strip().startswith(
+                "Return only one tag: <confidence>N</confidence>"
+            )
+            for message in messages
+        )
+        if not confidence_only_request:
+            messages = _append_confidence_instruction(messages)
         payload = {
             "model": self.model,
             "messages": messages,
@@ -1148,10 +1194,6 @@ class OpenAICompatibleLLM:
         completion_tokens = int(usage.get("completion_tokens", 0) or 0)
         total_tokens = int(usage.get("total_tokens", prompt_tokens + completion_tokens) or 0)
         latency_ms = (time.perf_counter() - started) * 1000.0
-        confidence_only_request = any(
-            "Return only one tag: <confidence>N</confidence>" in str(message.get("content") or "")
-            for message in messages
-        )
         if (
             os.getenv("REQUIRE_CONFIDENCE_TAG", "").strip().lower() in {"1", "true", "yes", "on"}
             and not confidence_only_request
@@ -1160,19 +1202,7 @@ class OpenAICompatibleLLM:
             retry_budget = dict(budget)
             retry_budget["max_output_tokens"] = min(32, int(retry_budget.get("max_output_tokens", 32) or 32))
             retry_out = self.chat(
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "Return only one tag: <confidence>N</confidence>, where N is an integer from 0 to 100.",
-                    },
-                    {
-                        "role": "user",
-                        "content": (
-                            "Estimate the probability that the previous benchmark answer is correct. "
-                            "Return only <confidence>N</confidence> with digits only."
-                        ),
-                    },
-                ],
+                messages=_build_confidence_retry_messages(messages, content),
                 budget=retry_budget,
             )
             content = content + "\n" + str(retry_out.get("content") or "").strip()
